@@ -1,0 +1,54 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+my $BUILD = $ENV{PKG_BEE_BUILD} // sprintf("%s/build", $ENV{HOME});
+
+sub url_to_package {
+    my ($url) = @_;
+    my $package;
+    if ($url =~ m{/([^/]+)$}) {
+        $package = $1;
+        if ($package =~ m{^([^\.]+)\.git$}) {
+            $package = $1;
+        }
+        return $package;
+    }
+    die "unexpected url";
+}
+
+if ($ARGV[0] eq 'build') {
+    my $url = $ARGV[1];
+    my $package = url_to_package($ARGV[1]);
+    if (-e "$BUILD/$package") {
+        `cd $BUILD/$package && make`;
+    }
+    else {
+        `cd $BUILD && git clone $url $package && cd $package && make`;
+    }
+    exit 0;
+}
+my @packages;
+my @args;
+for my $arg (@ARGV) {
+    if ($arg =~ m{^-}) {
+        push @args, $arg;
+        next;
+    }
+    if (-e "$BUILD/$arg") {
+        push @packages, "$BUILD/$arg/package.pc";
+    }
+    else {
+        push @packages, $arg;
+    }
+}
+my $argl = join(' ', @args);
+my $pkgs = join(' ', @packages);
+my @flags;
+for my $package (@packages) {
+    my $output = `pkg-config $argl $package`;
+    chomp $output;
+    push @flags, $output;
+}
+print join(' ', @flags) . "\n";
